@@ -25,7 +25,7 @@ import (
 
 // @title           Identity Service API
 // @version         1.0
-// @description     API documentation cho Identity Service của PhazelSound
+// @description     API documentation cho Identity Service
 // @host            localhost:8080
 // @BasePath        /
 func main() {
@@ -49,6 +49,11 @@ func main() {
 	defer pgPool.Close()
 	log.Info("postgres connected")
 
+	if err := infra.RunMigrations(context.Background(), pgPool, log); err != nil {
+		log.Fatal("migration failed", zap.Error(err))
+	}
+	log.Info("database schema up to date")
+
 	redisClient, err := infra.NewRedisClient(cfg.RedisHost, cfg.RedisPort, cfg.RedisPassword)
 	if err != nil {
 		log.Fatal("redis init failed", zap.Error(err))
@@ -69,7 +74,8 @@ func main() {
 
 	userRepository := postgresRepo.NewUserRepository(pgPool)
 	otpRepository := redisRepo.NewOTPRepository(redisClient)
-	rateLimitRepo := redisRepo.NewRateLimitRepository(redisClient)
+	tokenRepository := redisRepo.NewTokenRepository(redisClient)
+	rateLimitRepository := redisRepo.NewRateLimitRepository(redisClient)
 
 	notifPublisher, err := publisher.NewNotificationPublisher(
 		rabbit.Channel,
@@ -83,10 +89,15 @@ func main() {
 	authUsecase := usecase.NewAuthUsecase(
 		userRepository,
 		otpRepository,
+		tokenRepository,
 		notifPublisher,
 		log,
 		cfg.OTPTTL,
 		cfg.OTPMaxResendPerHour,
+		cfg.JWTAccessSecret,
+		cfg.JWTRefreshSecret,
+		cfg.JWTAccessTTL,
+		cfg.JWTRefreshTTL,
 	)
 
 	authHandler := handler.NewAuthHandler(authUsecase, log)
@@ -97,7 +108,7 @@ func main() {
 
 	r := router.New(
 		authHandler,
-		rateLimitRepo,
+		rateLimitRepository,
 		cfg.RateLimitIPMax,
 		cfg.RateLimitIPTTL,
 		cfg.RateLimitDeviceMax,

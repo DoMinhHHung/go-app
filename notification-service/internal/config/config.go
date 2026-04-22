@@ -11,13 +11,14 @@ type Config struct {
 	AppPort string
 	AppName string
 
-	RabbitMQHost     string
-	RabbitMQPort     int
-	RabbitMQUsername string
-	RabbitMQPassword string
-	RabbitMQVHost    string
-	RabbitMQExchange string
-	RabbitMQQueue    string
+	RabbitMQHost       string
+	RabbitMQPort       int
+	RabbitMQUsername   string
+	RabbitMQPassword   string
+	RabbitMQVHost      string
+	RabbitMQExchange   string
+	RabbitMQQueue      string
+	RabbitMQRoutingKey string
 
 	SMTPHost     string
 	SMTPPort     int
@@ -40,13 +41,14 @@ func Load() (*Config, error) {
 		AppPort: viper.GetString("APP_PORT"),
 		AppName: viper.GetString("APP_NAME"),
 
-		RabbitMQHost:     viper.GetString("RABBITMQ_HOST"),
-		RabbitMQPort:     viper.GetInt("RABBITMQ_PORT"),
-		RabbitMQUsername: viper.GetString("RABBITMQ_USERNAME"),
-		RabbitMQPassword: viper.GetString("RABBITMQ_PASSWORD"),
-		RabbitMQVHost:    viper.GetString("RABBITMQ_VHOST"),
-		RabbitMQExchange: viper.GetString("RABBITMQ_EXCHANGE"),
-		RabbitMQQueue:    viper.GetString("RABBITMQ_QUEUE"),
+		RabbitMQHost:       viper.GetString("RABBITMQ_HOST"),
+		RabbitMQPort:       viper.GetInt("RABBITMQ_PORT"),
+		RabbitMQUsername:   viper.GetString("RABBITMQ_USERNAME"),
+		RabbitMQPassword:   viper.GetString("RABBITMQ_PASSWORD"),
+		RabbitMQVHost:      viper.GetString("RABBITMQ_VHOST"),
+		RabbitMQExchange:   viper.GetString("RABBITMQ_EXCHANGE"),
+		RabbitMQQueue:      viper.GetString("RABBITMQ_QUEUE"),
+		RabbitMQRoutingKey: viper.GetString("RABBITMQ_ROUTING_KEY"),
 
 		SMTPHost:     viper.GetString("SMTP_HOST"),
 		SMTPPort:     viper.GetInt("SMTP_PORT"),
@@ -64,8 +66,12 @@ func validate(cfg *Config) error {
 		value string
 	}{
 		{"RABBITMQ_HOST", cfg.RabbitMQHost},
+		{"RABBITMQ_EXCHANGE", cfg.RabbitMQExchange},
+		{"RABBITMQ_QUEUE", cfg.RabbitMQQueue},
+		{"RABBITMQ_ROUTING_KEY", cfg.RabbitMQRoutingKey},
 		{"SMTP_HOST", cfg.SMTPHost},
 		{"SMTP_USERNAME", cfg.SMTPUsername},
+		{"SMTP_FROM", cfg.SMTPFrom},
 	}
 
 	for _, r := range required {

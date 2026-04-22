@@ -4,10 +4,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"reflect"
+	"strings"
 	"time"
 
 	_ "github.com/DoMinhHHung/go-app/identity-service/docs"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
@@ -16,6 +20,18 @@ import (
 	mw "github.com/DoMinhHHung/go-app/identity-service/internal/delivery/http/middleware"
 	domainRepo "github.com/DoMinhHHung/go-app/identity-service/internal/domain/repository"
 )
+
+func init() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			if name == "-" || name == "" {
+				return fld.Name
+			}
+			return name
+		})
+	}
+}
 
 func New(
 	authHandler *handler.AuthHandler,
@@ -45,17 +61,18 @@ func New(
 	})
 
 	v1 := r.Group("/api/v1")
+	auth := v1.Group("/auth")
+	auth.Use(rl.ByIP(), rl.ByDevice())
 	{
-		auth := v1.Group("/auth")
-		auth.Use(rl.ByIP(), rl.ByDevice())
-		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/verify-otp", authHandler.VerifyOTP)
-			auth.POST("/resend-otp",
-				rl.ByEmail(5, time.Hour),
-				authHandler.ResendOTP,
-			)
-		}
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/verify-otp", authHandler.VerifyOTP)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.RefreshToken)
+		auth.POST("/logout", authHandler.Logout)
+		auth.POST("/resend-otp",
+			rl.ByEmail(5, time.Hour),
+			authHandler.ResendOTP,
+		)
 	}
 
 	return r

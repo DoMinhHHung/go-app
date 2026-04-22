@@ -11,6 +11,8 @@ type OTPRepository interface {
 	Delete(ctx context.Context, email string) error
 	IncrResendCount(ctx context.Context, email string, windowTTL time.Duration) (int64, error)
 	GetResendCount(ctx context.Context, email string) (int64, error)
+	IncrAttemptCount(ctx context.Context, email string, ttl time.Duration) (int64, error)
+	DeleteAttemptCount(ctx context.Context, email string) error
 }
 
 type RateLimitRepository interface {

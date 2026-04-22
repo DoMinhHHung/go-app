@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.ErrorResponse:
+  dto.ErrorResponse:
     properties:
       code:
         type: string
@@ -9,7 +9,47 @@ definitions:
       success:
         type: boolean
     type: object
-  github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.RegisterRequest:
+  dto.LoginRequest:
+    properties:
+      email_address:
+        type: string
+      password:
+        type: string
+    required:
+    - email_address
+    - password
+    type: object
+  dto.LoginResponseData:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+    type: object
+  dto.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RefreshResponseData:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+    type: object
+  dto.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RegisterRequest:
     properties:
       email_address:
         type: string
@@ -21,13 +61,22 @@ definitions:
         minLength: 8
         type: string
       phone_number:
+        maxLength: 15
+        minLength: 7
         type: string
     required:
     - email_address
     - full_name
     - password
     type: object
-  github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.Response:
+  dto.ResendOTPRequest:
+    properties:
+      email_address:
+        type: string
+    required:
+    - email_address
+    type: object
+  dto.Response:
     properties:
       data: {}
       message:
@@ -35,13 +84,112 @@ definitions:
       success:
         type: boolean
     type: object
+  dto.VerifyOTPRequest:
+    properties:
+      email_address:
+        type: string
+      otp_code:
+        type: string
+    required:
+    - email_address
+    - otp_code
+    type: object
 host: localhost:8080
 info:
   contact: {}
-  description: API documentation cho Identity Service của PhazelSound
+  description: API documentation cho Identity Service
   title: Identity Service API
   version: "1.0"
 paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LoginResponseData'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Đăng nhập
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Logout
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Đăng xuất
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.RefreshResponseData'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Làm mới access token
+      tags:
+      - auth
   /api/v1/auth/register:
     post:
       consumes:
@@ -53,27 +201,89 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.RegisterRequest'
+          $ref: '#/definitions/dto.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.Response'
+            $ref: '#/definitions/dto.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/github_com_DoMinhHHung_go-app_identity-service_internal_delivery_http_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Đăng ký user mới
+      tags:
+      - auth
+  /api/v1/auth/resend-otp:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Resend OTP
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ResendOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Gửi lại OTP
+      tags:
+      - auth
+  /api/v1/auth/verify-otp:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: OTP verification
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Xác thực OTP
       tags:
       - auth
 swagger: "2.0"

@@ -1,0 +1,401 @@
+basePath: /
+definitions:
+  dto.ErrorResponse:
+    properties:
+      code:
+        example: ERROR_CODE
+        type: string
+      message:
+        example: error description
+        type: string
+      success:
+        example: false
+        type: boolean
+    type: object
+  dto.HealthResponse:
+    properties:
+      env:
+        example: development
+        type: string
+      service:
+        example: api-gateway
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  dto.LoginData:
+    properties:
+      access_token:
+        example: eyJhbGci...
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  dto.LoginRequest:
+    properties:
+      email_address:
+        example: user@example.com
+        type: string
+      password:
+        example: Secret123
+        type: string
+    type: object
+  dto.LogoutRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  dto.RefreshData:
+    properties:
+      access_token:
+        example: eyJhbGci...
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+    type: object
+  dto.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    type: object
+  dto.RegisterRequest:
+    properties:
+      email_address:
+        example: user@example.com
+        type: string
+      full_name:
+        example: Nguyen Van A
+        type: string
+      password:
+        example: Secret123
+        type: string
+      phone_number:
+        example: "+84912345678"
+        type: string
+    type: object
+  dto.ResendOTPRequest:
+    properties:
+      email_address:
+        example: user@example.com
+        type: string
+    type: object
+  dto.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        example: operation successful
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  dto.VerifyOTPRequest:
+    properties:
+      email_address:
+        example: user@example.com
+        type: string
+      otp_code:
+        example: "123456"
+        type: string
+    type: object
+host: localhost:8000
+info:
+  contact: {}
+  description: Cổng vào duy nhất cho tất cả microservices. Xử lý authentication, rate
+    limiting, và routing.
+  title: API Gateway
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Xác thực email và password. Trả về access token (15 phút) và refresh
+        token (7 ngày).
+      parameters:
+      - description: Thông tin đăng nhập
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LoginData'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Email not verified / account banned
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Đăng nhập
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Vô hiệu hóa refresh token. Access token sẽ hết hạn tự nhiên.
+      parameters:
+      - description: Refresh token cần revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Invalid token
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Đăng xuất
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Dùng refresh token để lấy access token mới mà không cần đăng nhập
+        lại.
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.RefreshData'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Invalid or expired refresh token
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Làm mới access token
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Tạo tài khoản mới và gửi mã OTP qua email. Tài khoản ở trạng thái
+        pending cho đến khi xác thực OTP.
+      parameters:
+      - description: Thông tin đăng ký
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+        "400":
+          description: Validation error / weak password
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Upstream unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Đăng ký tài khoản
+      tags:
+      - auth
+  /api/v1/auth/resend-otp:
+    post:
+      consumes:
+      - application/json
+      description: Gửi lại mã OTP mới qua email. Giới hạn 3 lần/giờ.
+      parameters:
+      - description: Email cần gửi lại OTP
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ResendOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Email already verified
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Resend limit reached
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Gửi lại OTP
+      tags:
+      - auth
+  /api/v1/auth/verify-otp:
+    post:
+      consumes:
+      - application/json
+      description: Xác thực mã OTP gửi qua email. Sau khi thành công tài khoản chuyển
+        sang active.
+      parameters:
+      - description: OTP verification
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: OTP invalid or expired
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too many attempts (max 5 per 30 min)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Xác thực OTP
+      tags:
+      - auth
+  /api/v1/users/me:
+    get:
+      description: Trả về thông tin profile của user đang đăng nhập.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+        "401":
+          description: Token invalid or missing
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy thông tin bản thân
+      tags:
+      - users
+  /health:
+    get:
+      description: Returns gateway status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.HealthResponse'
+      summary: Health check
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: 'Nhập "Bearer " và theo sau là JWT access token. Ví dụ: "Bearer eyJhbGci..."'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,30 @@
+basePath: /
+host: localhost:8081
+info:
+  contact: {}
+  description: Quản lý thông tin profile người dùng.
+  title: User Service API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Kiểm tra user-service có đang chạy không
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: Nhập "Bearer " và theo sau là JWT access token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

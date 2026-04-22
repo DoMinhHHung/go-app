@@ -6,13 +6,12 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/DoMinhHHung/go-app/identity-service/internal/domain/entity"
+	domainRepo "github.com/DoMinhHHung/go-app/identity-service/internal/domain/repository"
 )
-
-var ErrUserNotFound = errors.New("user: not found")
-var ErrEmailConflict = errors.New("user: email already exists")
 
 type userRepo struct {
 	pool *pgxpool.Pool
@@ -37,8 +36,11 @@ func (r *userRepo) Create(ctx context.Context, u *entity.User) error {
 		u.Status,
 	)
 	if err != nil {
-		if isUniqueViolation(err) {
-			return ErrEmailConflict
+		if pgErr, ok := getUniqueViolation(err); ok {
+			if pgErr.ConstraintName == "idx_users_phone_active" {
+				return domainRepo.ErrPhoneConflict
+			}
+			return domainRepo.ErrEmailConflict
 		}
 		return fmt.Errorf("user_repo: create: %w", err)
 	}
@@ -74,6 +76,24 @@ func (r *userRepo) ExistsActiveEmail(ctx context.Context, email string) (bool, e
 	return exists, err
 }
 
+func (r *userRepo) DeleteByID(ctx context.Context, id string) error {
+	query := `UPDATE users SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	_, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("user_repo: delete: %w", err)
+	}
+	return nil
+}
+
+func (r *userRepo) ActivateByEmail(ctx context.Context, email string) error {
+	query := `UPDATE users SET status = $1, updated_at = NOW() WHERE email_address = $2 AND deleted_at IS NULL`
+	_, err := r.pool.Exec(ctx, query, entity.StatusActive, email)
+	if err != nil {
+		return fmt.Errorf("user_repo: activate: %w", err)
+	}
+	return nil
+}
+
 func scanUser(row pgx.Row) (*entity.User, error) {
 	var u entity.User
 	err := row.Scan(
@@ -89,7 +109,7 @@ func scanUser(row pgx.Row) (*entity.User, error) {
 		&u.DeletedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrUserNotFound
+		return nil, domainRepo.ErrUserNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("user_repo: scan: %w", err)
@@ -97,6 +117,10 @@ func scanUser(row pgx.Row) (*entity.User, error) {
 	return &u, nil
 }
 
-func isUniqueViolation(err error) bool {
-	return err != nil && (fmt.Sprintf("%s", err) == "ERROR: duplicate key value violates unique constraint")
+func getUniqueViolation(err error) (*pgconn.PgError, bool) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return pgErr, true
+	}
+	return nil, false
 }

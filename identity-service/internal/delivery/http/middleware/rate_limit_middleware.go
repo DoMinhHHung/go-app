@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -73,12 +76,34 @@ func (m *RateLimitMiddleware) ByDevice() gin.HandlerFunc {
 	}
 }
 
+// ByEmail reads the request body, re-injects it so downstream handlers can read it again,
+// then applies per-email rate limiting. If the email is missing or malformed, falls back
+// to per-IP limiting to prevent bypass via invalid JSON.
 func (m *RateLimitMiddleware) ByEmail(max int, ttl time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, dto.Fail("invalid request body", "BAD_REQUEST"))
+			return
+		}
+		// Re-inject so downstream ShouldBindJSON calls work normally.
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 		var body struct {
 			EmailAddress string `json:"email_address"`
 		}
-		if err := c.ShouldBindJSON(&body); err != nil || body.EmailAddress == "" {
+		_ = json.Unmarshal(bodyBytes, &body)
+
+		if body.EmailAddress == "" {
+			// Fallback: rate limit by IP to prevent abuse with missing/malformed email.
+			ip := c.ClientIP()
+			key := fmt.Sprintf("rate_limit:email_fallback:%s", ip)
+			count, rErr := m.repo.IncrBy(c.Request.Context(), key, ttl)
+			if rErr == nil && count > int64(max) {
+				c.AbortWithStatusJSON(http.StatusTooManyRequests,
+					dto.Fail("too many requests", "RATE_LIMIT_EXCEEDED"))
+				return
+			}
 			c.Next()
 			return
 		}

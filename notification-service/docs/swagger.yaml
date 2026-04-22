@@ -1,0 +1,24 @@
+basePath: /
+host: localhost:8082
+info:
+  contact: {}
+  description: Service nhận message từ RabbitMQ và gửi email thông báo (OTP, v.v.).
+  title: Notification Service API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Kiểm tra notification-service có đang chạy không
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - system
+swagger: "2.0"

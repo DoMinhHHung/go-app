@@ -58,3 +58,10 @@ docs/docs.go
 
 .air.toml
 tmp/
+
+dev.*
+Makefile
+.claude/
+.vscode/
+.idea/
+.cursor/

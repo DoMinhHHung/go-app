@@ -13,8 +13,9 @@ const (
 	RoleAdmin Role = "admin"
 	RoleUser  Role = "user"
 
-	StatusActive Status = "active"
-	StatusBanned Status = "banned"
+	StatusPending Status = "pending"
+	StatusActive  Status = "active"
+	StatusBanned  Status = "banned"
 )
 
 type User struct {

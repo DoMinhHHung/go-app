@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     password      VARCHAR(255) NOT NULL,
     role          VARCHAR(20)  NOT NULL DEFAULT 'user'
                                CHECK (role IN ('admin', 'user')),
-    status        VARCHAR(20)  NOT NULL DEFAULT 'active'
-                               CHECK (status IN ('active', 'banned')),
+    status        VARCHAR(20)  NOT NULL DEFAULT 'pending'
+                               CHECK (status IN ('pending', 'active', 'banned')),
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     deleted_at    TIMESTAMPTZ
