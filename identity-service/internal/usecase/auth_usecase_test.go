@@ -68,6 +68,7 @@ type mockOTPRepo struct {
 	incrResendFn    func(ctx context.Context, email string, ttl time.Duration) (int64, error)
 	getResendFn     func(ctx context.Context, email string) (int64, error)
 	incrAttemptFn   func(ctx context.Context, email string, ttl time.Duration) (int64, error)
+	getAttemptFn    func(ctx context.Context, email string) (int64, error)
 	deleteAttemptFn func(ctx context.Context, email string) error
 }
 
@@ -106,6 +107,12 @@ func (m *mockOTPRepo) IncrAttemptCount(ctx context.Context, email string, ttl ti
 		return m.incrAttemptFn(ctx, email, ttl)
 	}
 	return 1, nil
+}
+func (m *mockOTPRepo) GetAttemptCount(ctx context.Context, email string) (int64, error) {
+	if m.getAttemptFn != nil {
+		return m.getAttemptFn(ctx, email)
+	}
+	return 0, nil
 }
 func (m *mockOTPRepo) DeleteAttemptCount(ctx context.Context, email string) error {
 	if m.deleteAttemptFn != nil {

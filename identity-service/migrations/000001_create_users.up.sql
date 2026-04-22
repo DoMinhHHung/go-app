@@ -19,6 +19,11 @@ CREATE UNIQUE INDEX idx_users_email_active
     ON users(email_address)
     WHERE deleted_at IS NULL;
 
+CREATE INDEX idx_users_email_status 
+    ON users(email_address, status) 
+    WHERE deleted_at IS NULL;
+
+
 CREATE UNIQUE INDEX idx_users_phone_active
     ON users(phone_number)
     WHERE deleted_at IS NULL AND phone_number IS NOT NULL;

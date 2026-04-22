@@ -65,7 +65,6 @@ func (c *EmailConsumer) Start(ctx context.Context) error {
 func (c *EmailConsumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	err := c.handler.Handle(ctx, msg.Body)
 	if err == nil {
-		// Happy path: acknowledge so RabbitMQ removes it from the queue.
 		if ackErr := msg.Ack(false); ackErr != nil {
 			c.logger.Error("ack failed", zap.Error(ackErr))
 		}

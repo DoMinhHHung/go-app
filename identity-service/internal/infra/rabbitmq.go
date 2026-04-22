@@ -16,7 +16,8 @@ func NewRabbitMQ(host string, port int, username, password, vhost string) (*Rabb
 
 	conn, err := amqp.Dial(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq: dial: %w", err)
+		safeURL := fmt.Sprintf("amqp://%s:***@%s:%d/%s", username, host, port, vhost)
+		return nil, fmt.Errorf("rabbitmq: dial %s: %w", safeURL, err)
 	}
 
 	ch, err := conn.Channel()

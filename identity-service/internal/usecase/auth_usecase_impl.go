@@ -162,15 +162,9 @@ func (uc *authUsecaseImpl) Register(ctx context.Context, input RegisterInput) er
 	return nil
 }
 
-// handleEmailConflict is called when Create returns ErrEmailConflict.
-// It distinguishes three cases:
-//  1. active/banned user  → ErrEmailAlreadyExists
-//  2. pending + OTP still valid → ErrPendingVerification (tell user to check email)
-//  3. pending + OTP expired    → soft-delete stale record, retry insert
 func (uc *authUsecaseImpl) handleEmailConflict(ctx context.Context, email string, newUser *entity.User) error {
 	existing, err := uc.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		// Can't look up existing user — treat as hard conflict
 		return ErrEmailAlreadyExists
 	}
 
@@ -178,32 +172,31 @@ func (uc *authUsecaseImpl) handleEmailConflict(ctx context.Context, email string
 		return ErrEmailAlreadyExists
 	}
 
-	// Pending user: check whether their OTP is still alive in Redis
 	_, otpErr := uc.otpRepo.Get(ctx, email)
 	if !errors.Is(otpErr, redisRepo.ErrOTPNotFound) {
-		// OTP key still exists → registration is in progress
 		return ErrPendingVerification
 	}
 
-	// OTP expired → stale pending account; reclaim the email
 	if rbErr := uc.userRepo.DeleteByID(ctx, existing.ID.String()); rbErr != nil {
 		uc.logger.Error("register: soft-delete stale pending failed", zap.Error(rbErr))
 		return ErrEmailAlreadyExists
 	}
 
 	if err := uc.userRepo.Create(ctx, newUser); err != nil {
-		return fmt.Errorf("register: retry after stale-pending cleanup: %w", err)
+		if errors.Is(err, domainRepo.ErrEmailConflict) {
+			return ErrEmailAlreadyExists
+		}
+		return fmt.Errorf("register: retry create: %w", err)
 	}
 	return nil
 }
 
 func (uc *authUsecaseImpl) VerifyOTP(ctx context.Context, email, code string) error {
-	// Check attempt count BEFORE fetching OTP to prevent timing oracle
-	attempts, err := uc.otpRepo.IncrAttemptCount(ctx, email, otpAttemptTTL)
+	attempts, err := uc.otpRepo.GetAttemptCount(ctx, email)
 	if err != nil {
 		return fmt.Errorf("verify otp: check attempts: %w", err)
 	}
-	if attempts > maxOTPAttempts {
+	if attempts >= maxOTPAttempts {
 		return ErrOTPTooManyAttempts
 	}
 
@@ -215,21 +208,15 @@ func (uc *authUsecaseImpl) VerifyOTP(ctx context.Context, email, code string) er
 		return fmt.Errorf("verify otp: get: %w", err)
 	}
 
-	if saved != code {
+	if subtle.ConstantTimeCompare([]byte(saved), []byte(code)) != 1 {
+		_, _ = uc.otpRepo.IncrAttemptCount(ctx, email, otpAttemptTTL)
 		return ErrOTPExpiredOrInvalid
 	}
 
-	// Success: clean up Redis state
 	_ = uc.otpRepo.Delete(ctx, email)
 	_ = uc.otpRepo.DeleteAttemptCount(ctx, email)
 
-	if err := uc.userRepo.ActivateByEmail(ctx, email); err != nil {
-		uc.logger.Error("verify otp: activate user failed", zap.String("email", email), zap.Error(err))
-		return fmt.Errorf("verify otp: activate user: %w", err)
-	}
-
-	uc.logger.Info("user verified and activated", zap.String("email", email))
-	return nil
+	return uc.userRepo.ActivateByEmail(ctx, email)
 }
 
 func (uc *authUsecaseImpl) ResendOTP(ctx context.Context, email string) error {
@@ -359,10 +346,15 @@ func (uc *authUsecaseImpl) Logout(ctx context.Context, refreshToken string) erro
 	if err != nil {
 		return ErrInvalidToken
 	}
+
+	stored, err := uc.tokenRepo.GetRefreshToken(ctx, userID)
+	if err != nil || stored != refreshToken {
+		return ErrInvalidToken
+	}
+
 	return uc.tokenRepo.DeleteRefreshToken(ctx, userID)
 }
 
-// generateOTP generates a cryptographically secure 6-digit OTP with a single rand call.
 func generateOTP() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
@@ -381,12 +373,18 @@ func hashArgon2id(password string) (string, error) {
 		argon2Memory, argon2Time, argon2Threads, salt, hash), nil
 }
 
-// verifyArgon2id verifies password against a stored argon2id hash using constant-time comparison.
 func verifyArgon2id(password, encodedHash string) (bool, error) {
-	// Format: $argon2id$v=19$m=65536,t=3,p=2$<salt_hex>$<hash_hex>
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false, errors.New("verify: invalid hash format")
+	}
+
+	var memory uint32
+	var timeCost uint32
+	var threads uint8
+	_, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &timeCost, &threads)
+	if err != nil {
+		return false, fmt.Errorf("verify: parse params: %w", err)
 	}
 
 	salt, err := hex.DecodeString(parts[4])
@@ -399,11 +397,11 @@ func verifyArgon2id(password, encodedHash string) (bool, error) {
 		return false, fmt.Errorf("verify: decode hash: %w", err)
 	}
 
-	computed := argon2.IDKey([]byte(password), salt, argon2Time, argon2Memory, argon2Threads, argon2KeyLen)
+	keyLen := uint32(len(expectedHash))
+	computed := argon2.IDKey([]byte(password), salt, timeCost, memory, threads, keyLen)
 	return subtle.ConstantTimeCompare(computed, expectedHash) == 1, nil
 }
 
-// validatePassword enforces minimum complexity: 8+ chars, uppercase, lowercase, digit.
 func validatePassword(password string) error {
 	if len(password) < 8 {
 		return ErrWeakPassword

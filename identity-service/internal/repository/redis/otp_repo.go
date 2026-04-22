@@ -11,7 +11,6 @@ import (
 
 var ErrOTPNotFound = errors.New("otp: not found or expired")
 
-// incrWithTTL atomically increments a counter and sets TTL on first creation.
 var incrWithTTL = redis.NewScript(`
 	local current = redis.call("INCR", KEYS[1])
 	if current == 1 then
@@ -47,8 +46,15 @@ func (r *otpRepo) Delete(ctx context.Context, email string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
-// IncrResendCount uses a Lua script to atomically increment and set TTL,
-// avoiding the race condition where Expire could fail after Incr.
+func (r *otpRepo) GetAttemptCount(ctx context.Context, email string) (int64, error) {
+	key := fmt.Sprintf("otp:attempts:%s", email)
+	val, err := r.client.Get(ctx, key).Int64()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
+	return val, err
+}
+
 func (r *otpRepo) IncrResendCount(ctx context.Context, email string, windowTTL time.Duration) (int64, error) {
 	key := fmt.Sprintf("otp:resend_count:%s", email)
 	res, err := incrWithTTL.Run(ctx, r.client, []string{key}, int(windowTTL.Seconds())).Int64()

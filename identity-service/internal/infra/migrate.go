@@ -42,6 +42,11 @@ var migrations = []struct {
 		CREATE INDEX IF NOT EXISTS idx_users_email      ON users(email_address);
 		CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
 	`},
+	{2, `
+    CREATE INDEX IF NOT EXISTS idx_users_email_status 
+        ON users(email_address, status) 
+        WHERE deleted_at IS NULL;
+`},
 }
 
 // RunMigrations applies any unapplied migrations on startup.

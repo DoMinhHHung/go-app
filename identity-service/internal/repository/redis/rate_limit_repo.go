@@ -7,6 +7,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+var incrWithExpireScript = redis.NewScript(`
+    local current = redis.call("INCR", KEYS[1])
+    if current == 1 then
+        redis.call("EXPIRE", KEYS[1], ARGV[1])
+    end
+    return current
+`)
+
 type rateLimitRepo struct {
 	client *redis.Client
 }
@@ -16,16 +24,5 @@ func NewRateLimitRepository(client *redis.Client) *rateLimitRepo {
 }
 
 func (r *rateLimitRepo) IncrBy(ctx context.Context, key string, ttl time.Duration) (int64, error) {
-	script := `
-		local current = redis.call("INCR", KEYS[1])
-		if current == 1 then
-			redis.call("EXPIRE", KEYS[1], ARGV[1])
-		end
-		return current
-	`
-	res, err := r.client.Eval(ctx, script, []string{key}, int(ttl.Seconds())).Int64()
-	if err != nil {
-		return 0, err
-	}
-	return res, nil
+	return incrWithExpireScript.Run(ctx, r.client, []string{key}, int(ttl.Seconds())).Int64()
 }

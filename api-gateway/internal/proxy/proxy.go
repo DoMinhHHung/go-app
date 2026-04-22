@@ -2,9 +2,11 @@ package proxy
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -22,9 +24,21 @@ func New(targetURL string, logger *zap.Logger) (*Proxy, error) {
 		return nil, fmt.Errorf("proxy: parse url %q: %w", targetURL, err)
 	}
 
-	rp := httputil.NewSingleHostReverseProxy(target)
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
 
-	// Override the director to forward X-Forwarded-* headers correctly.
+	rp := httputil.NewSingleHostReverseProxy(target)
+	rp.Transport = transport
+
 	original := rp.Director
 	rp.Director = func(req *http.Request) {
 		original(req)
@@ -50,6 +64,10 @@ func New(targetURL string, logger *zap.Logger) (*Proxy, error) {
 // It also injects X-Request-ID and X-User-* headers set by upstream middlewares.
 func (p *Proxy) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Request.Header.Del("X-User-ID")
+		c.Request.Header.Del("X-User-Email")
+		c.Request.Header.Del("X-User-Role")
+
 		if reqID, ok := c.Get("request_id"); ok {
 			c.Request.Header.Set("X-Request-ID", fmt.Sprintf("%v", reqID))
 		}
