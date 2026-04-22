@@ -30,6 +30,7 @@ type LoginOutput struct {
 }
 
 type RefreshOutput struct {
-	AccessToken string
-	ExpiresIn   int64
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int64
 }

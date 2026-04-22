@@ -14,10 +14,10 @@ func NewPostgresPool(databaseURL string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("postgres: parse config: %w", err)
 	}
 
-	cfg.MaxConns = 20
-	cfg.MinConns = 2
-	cfg.MaxConnLifetime = 30 * time.Minute
-	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConns = 25
+	cfg.MinConns = 5
+	cfg.MaxConnLifetime = 1 * time.Hour
+	cfg.MaxConnIdleTime = 10 * time.Minute
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

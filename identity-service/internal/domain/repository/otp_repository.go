@@ -14,6 +14,8 @@ type OTPRepository interface {
 	IncrAttemptCount(ctx context.Context, email string, ttl time.Duration) (int64, error)
 	DeleteAttemptCount(ctx context.Context, email string) error
 	GetAttemptCount(ctx context.Context, email string) (int64, error)
+	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
+	ReleaseLock(ctx context.Context, key string) error
 }
 
 type RateLimitRepository interface {

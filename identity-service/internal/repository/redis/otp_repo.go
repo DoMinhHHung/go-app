@@ -73,7 +73,18 @@ func (r *otpRepo) GetResendCount(ctx context.Context, email string) (int64, erro
 	return val, err
 }
 
-// IncrAttemptCount uses the same atomic Lua script to track failed OTP attempts.
+func (r *otpRepo) AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	ok, err := r.client.SetNX(ctx, key, "1", ttl).Result()
+	if err != nil {
+		return false, fmt.Errorf("redis: acquire lock %q: %w", key, err)
+	}
+	return ok, nil
+}
+
+func (r *otpRepo) ReleaseLock(ctx context.Context, key string) error {
+	return r.client.Del(ctx, key).Err()
+}
+
 func (r *otpRepo) IncrAttemptCount(ctx context.Context, email string, ttl time.Duration) (int64, error) {
 	key := fmt.Sprintf("otp:attempts:%s", email)
 	res, err := incrWithTTL.Run(ctx, r.client, []string{key}, int(ttl.Seconds())).Int64()

@@ -49,7 +49,6 @@ var migrations = []struct {
 `},
 }
 
-// RunMigrations applies any unapplied migrations on startup.
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool, logger *zap.Logger) error {
 	if _, err := pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -62,7 +62,6 @@ func New(
 
 	v1 := r.Group("/api/v1")
 	auth := v1.Group("/auth")
-	auth.Use(rl.ByIP(), rl.ByDevice())
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/verify-otp", authHandler.VerifyOTP)

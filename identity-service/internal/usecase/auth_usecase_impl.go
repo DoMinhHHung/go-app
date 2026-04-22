@@ -26,7 +26,7 @@ import (
 const (
 	argon2Time    = 3
 	argon2Memory  = 64 * 1024
-	argon2Threads = 2
+	argon2Threads = 4
 	argon2KeyLen  = 32
 	argon2SaltLen = 16
 
@@ -163,6 +163,13 @@ func (uc *authUsecaseImpl) Register(ctx context.Context, input RegisterInput) er
 }
 
 func (uc *authUsecaseImpl) handleEmailConflict(ctx context.Context, email string, newUser *entity.User) error {
+	lockKey := fmt.Sprintf("register:lock:%s", email)
+	acquired, err := uc.otpRepo.AcquireLock(ctx, lockKey, 10*time.Second)
+	if err != nil || !acquired {
+		return ErrEmailAlreadyExists
+	}
+	defer uc.otpRepo.ReleaseLock(ctx, lockKey)
+
 	existing, err := uc.userRepo.FindByEmail(ctx, email)
 	if err != nil {
 		return ErrEmailAlreadyExists
@@ -192,14 +199,6 @@ func (uc *authUsecaseImpl) handleEmailConflict(ctx context.Context, email string
 }
 
 func (uc *authUsecaseImpl) VerifyOTP(ctx context.Context, email, code string) error {
-	attempts, err := uc.otpRepo.GetAttemptCount(ctx, email)
-	if err != nil {
-		return fmt.Errorf("verify otp: check attempts: %w", err)
-	}
-	if attempts >= maxOTPAttempts {
-		return ErrOTPTooManyAttempts
-	}
-
 	saved, err := uc.otpRepo.Get(ctx, email)
 	if errors.Is(err, redisRepo.ErrOTPNotFound) {
 		return ErrOTPExpiredOrInvalid
@@ -208,14 +207,20 @@ func (uc *authUsecaseImpl) VerifyOTP(ctx context.Context, email, code string) er
 		return fmt.Errorf("verify otp: get: %w", err)
 	}
 
+	attempts, err := uc.otpRepo.IncrAttemptCount(ctx, email, otpAttemptTTL)
+	if err != nil {
+		return fmt.Errorf("verify otp: incr attempts: %w", err)
+	}
+	if attempts > maxOTPAttempts {
+		return ErrOTPTooManyAttempts
+	}
+
 	if subtle.ConstantTimeCompare([]byte(saved), []byte(code)) != 1 {
-		_, _ = uc.otpRepo.IncrAttemptCount(ctx, email, otpAttemptTTL)
 		return ErrOTPExpiredOrInvalid
 	}
 
 	_ = uc.otpRepo.Delete(ctx, email)
 	_ = uc.otpRepo.DeleteAttemptCount(ctx, email)
-
 	return uc.userRepo.ActivateByEmail(ctx, email)
 }
 
@@ -327,17 +332,28 @@ func (uc *authUsecaseImpl) RefreshToken(ctx context.Context, refreshToken string
 		return RefreshOutput{}, fmt.Errorf("refresh token: find user: %w", err)
 	}
 
+	// Generate access token mới
 	accessToken, err := jwtpkg.GenerateAccessToken(
 		userID, user.EmailAddress, string(user.Role),
 		uc.jwtAccessSecret, uc.jwtAccessTTL,
 	)
 	if err != nil {
-		return RefreshOutput{}, fmt.Errorf("refresh token: generate: %w", err)
+		return RefreshOutput{}, fmt.Errorf("refresh token: generate access: %w", err)
+	}
+
+	// 🔑 Rotate: generate refresh token mới, invalidate cũ
+	newRefreshToken, err := jwtpkg.GenerateRefreshToken(userID, uc.jwtRefreshSecret, uc.jwtRefreshTTL)
+	if err != nil {
+		return RefreshOutput{}, fmt.Errorf("refresh token: generate refresh: %w", err)
+	}
+	if err := uc.tokenRepo.SaveRefreshToken(ctx, userID, newRefreshToken, uc.jwtRefreshTTL); err != nil {
+		return RefreshOutput{}, fmt.Errorf("refresh token: save: %w", err)
 	}
 
 	return RefreshOutput{
-		AccessToken: accessToken,
-		ExpiresIn:   int64(uc.jwtAccessTTL.Seconds()),
+		AccessToken:  accessToken,
+		RefreshToken: newRefreshToken,
+		ExpiresIn:    int64(uc.jwtAccessTTL.Seconds()),
 	}, nil
 }
 
