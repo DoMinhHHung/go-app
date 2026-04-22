@@ -23,6 +23,11 @@ import (
 	"github.com/DoMinhHHung/go-app/identity-service/pkg/logger"
 )
 
+// @title           Identity Service API
+// @version         1.0
+// @description     API documentation cho Identity Service của PhazelSound
+// @host            localhost:8080
+// @BasePath        /
 func main() {
 	cfg, err := config.Load()
 	if err != nil {

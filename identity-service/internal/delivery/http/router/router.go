@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	_ "github.com/DoMinhHHung/go-app/identity-service/docs"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
 	"github.com/DoMinhHHung/go-app/identity-service/internal/delivery/http/handler"
@@ -32,6 +35,7 @@ func New(
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "identity-service"})
 	})
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	rl := mw.NewRateLimitMiddleware(rateLimitRepo, mw.RateLimitConfig{
 		IPMax:     rateLimitIPMax,

@@ -23,6 +23,18 @@ func NewAuthHandler(authUsecase usecase.AuthUsecase, logger *zap.Logger) *AuthHa
 	}
 }
 
+// Register godoc
+// @Summary      Đăng ký user mới
+// @Description  Tạo tài khoản và gửi OTP qua email
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body dto.RegisterRequest true "Thông tin đăng ký"
+// @Success      201 {object} dto.Response
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
