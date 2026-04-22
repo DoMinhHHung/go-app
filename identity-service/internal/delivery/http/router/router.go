@@ -63,12 +63,22 @@ func New(
 	v1 := r.Group("/api/v1")
 	auth := v1.Group("/auth")
 	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/verify-otp", authHandler.VerifyOTP)
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/refresh", authHandler.RefreshToken)
-		auth.POST("/logout", authHandler.Logout)
+		auth.POST("/register", rl.ByIP(),
+			rl.ByDevice(),
+			authHandler.Register)
+		auth.POST("/verify-otp",
+			rl.ByIP(), rl.ByDevice(),
+			authHandler.VerifyOTP)
+		auth.POST("/login",
+			rl.ByIP(),
+			rl.ByDevice(),
+			authHandler.Login)
+		auth.POST("/refresh",
+			authHandler.RefreshToken)
+		auth.POST("/logout",
+			authHandler.Logout)
 		auth.POST("/resend-otp",
+			rl.ByIP(), rl.ByDevice(),
 			rl.ByEmail(5, time.Hour),
 			authHandler.ResendOTP,
 		)

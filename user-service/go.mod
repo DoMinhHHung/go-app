@@ -4,6 +4,9 @@ go 1.26.2
 
 require (
 	github.com/gin-gonic/gin v1.12.0
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.9.2
+	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.0
 )

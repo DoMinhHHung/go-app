@@ -52,6 +52,7 @@ var (
 
 type EventPublisher interface {
 	PublishOTPEmail(ctx context.Context, eventID, recipient, otpCode string, expireSeconds int) error
+	PublishUserSync(ctx context.Context, eventID, userID, email string, phoneNumber *string, fullName, role, status string, createdAt, updatedAt time.Time) error
 }
 
 type authUsecaseImpl struct {
@@ -155,6 +156,10 @@ func (uc *authUsecaseImpl) Register(ctx context.Context, input RegisterInput) er
 		uc.logger.Warn("register: publish otp email failed", zap.Error(err))
 	}
 
+	if err := uc.publishUserSync(ctx, user); err != nil {
+		uc.logger.Warn("register: publish user sync failed", zap.String("user_id", user.ID.String()), zap.Error(err))
+	}
+
 	uc.logger.Info("user registered, pending verification",
 		zap.String("email", input.EmailAddress),
 		zap.String("user_id", userID.String()),
@@ -221,7 +226,18 @@ func (uc *authUsecaseImpl) VerifyOTP(ctx context.Context, email, code string) er
 
 	_ = uc.otpRepo.Delete(ctx, email)
 	_ = uc.otpRepo.DeleteAttemptCount(ctx, email)
-	return uc.userRepo.ActivateByEmail(ctx, email)
+	if err := uc.userRepo.ActivateByEmail(ctx, email); err != nil {
+		return err
+	}
+
+	user, err := uc.userRepo.FindByEmail(ctx, email)
+	if err == nil {
+		if publishErr := uc.publishUserSync(ctx, user); publishErr != nil {
+			uc.logger.Warn("verify otp: publish user sync failed", zap.String("email", email), zap.Error(publishErr))
+		}
+	}
+
+	return nil
 }
 
 func (uc *authUsecaseImpl) ResendOTP(ctx context.Context, email string) error {
@@ -309,6 +325,9 @@ func (uc *authUsecaseImpl) Login(ctx context.Context, input LoginInput) (LoginOu
 	}
 
 	uc.logger.Info("user logged in", zap.String("user_id", user.ID.String()))
+	if err := uc.publishUserSync(ctx, user); err != nil {
+		uc.logger.Warn("login: publish user sync failed", zap.String("user_id", user.ID.String()), zap.Error(err))
+	}
 	return LoginOutput{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -377,6 +396,35 @@ func generateOTP() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func (uc *authUsecaseImpl) publishUserSync(ctx context.Context, user *entity.User) error {
+	eventID, err := uuid.NewV7()
+	if err != nil {
+		eventID = user.ID
+	}
+
+	createdAt := user.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	updatedAt := user.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+	}
+
+	return uc.publisher.PublishUserSync(
+		ctx,
+		eventID.String(),
+		user.ID.String(),
+		user.EmailAddress,
+		user.PhoneNumber,
+		user.FullName,
+		string(user.Role),
+		string(user.Status),
+		createdAt,
+		updatedAt,
+	)
 }
 
 func hashArgon2id(password string) (string, error) {

@@ -17,13 +17,27 @@ type EmailEvent struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
-type NotificationPublisher struct {
-	channel    *amqp.Channel
-	exchange   string
-	routingKey string
+type UserSyncEvent struct {
+	EventID     string    `json:"event_id"`
+	EventType   string    `json:"event_type"`
+	UserID      string    `json:"user_id"`
+	Email       string    `json:"email"`
+	PhoneNumber *string   `json:"phone_number"`
+	FullName    string    `json:"full_name"`
+	Role        string    `json:"role"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-func NewNotificationPublisher(ch *amqp.Channel, exchange, routingKey string) (*NotificationPublisher, error) {
+type NotificationPublisher struct {
+	channel            *amqp.Channel
+	exchange           string
+	emailRoutingKey    string
+	userSyncRoutingKey string
+}
+
+func NewNotificationPublisher(ch *amqp.Channel, exchange, emailRoutingKey, userSyncRoutingKey string) (*NotificationPublisher, error) {
 	err := ch.ExchangeDeclare(
 		exchange,
 		"direct",
@@ -38,9 +52,10 @@ func NewNotificationPublisher(ch *amqp.Channel, exchange, routingKey string) (*N
 	}
 
 	return &NotificationPublisher{
-		channel:    ch,
-		exchange:   exchange,
-		routingKey: routingKey,
+		channel:            ch,
+		exchange:           exchange,
+		emailRoutingKey:    emailRoutingKey,
+		userSyncRoutingKey: userSyncRoutingKey,
 	}, nil
 }
 
@@ -61,9 +76,35 @@ func (p *NotificationPublisher) PublishOTPEmail(ctx context.Context, eventID, re
 		return fmt.Errorf("publisher: marshal: %w", err)
 	}
 
+	return p.publish(ctx, p.emailRoutingKey, eventID, body)
+}
+
+func (p *NotificationPublisher) PublishUserSync(ctx context.Context, eventID, userID, email string, phoneNumber *string, fullName, role, status string, createdAt, updatedAt time.Time) error {
+	event := UserSyncEvent{
+		EventID:     eventID,
+		EventType:   "user_sync",
+		UserID:      userID,
+		Email:       email,
+		PhoneNumber: phoneNumber,
+		FullName:    fullName,
+		Role:        role,
+		Status:      status,
+		CreatedAt:   createdAt.UTC(),
+		UpdatedAt:   updatedAt.UTC(),
+	}
+
+	body, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("publisher: marshal: %w", err)
+	}
+
+	return p.publish(ctx, p.userSyncRoutingKey, eventID, body)
+}
+
+func (p *NotificationPublisher) publish(ctx context.Context, routingKey, eventID string, body []byte) error {
 	return p.channel.PublishWithContext(ctx,
 		p.exchange,
-		p.routingKey,
+		routingKey,
 		false,
 		false,
 		amqp.Publishing{

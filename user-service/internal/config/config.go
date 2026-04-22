@@ -17,6 +17,15 @@ type Config struct {
 	RedisPort     string
 	RedisPassword string
 
+	RabbitMQHost       string
+	RabbitMQPort       int
+	RabbitMQUsername   string
+	RabbitMQPassword   string
+	RabbitMQVHost      string
+	RabbitMQExchange   string
+	RabbitMQQueue      string
+	RabbitMQRoutingKey string
+
 	JWTAccessSecret string
 }
 
@@ -40,6 +49,15 @@ func Load() (*Config, error) {
 		RedisPort:     viper.GetString("REDIS_PORT"),
 		RedisPassword: viper.GetString("REDIS_PASSWORD"),
 
+		RabbitMQHost:       viper.GetString("RABBITMQ_HOST"),
+		RabbitMQPort:       viper.GetInt("RABBITMQ_PORT"),
+		RabbitMQUsername:   viper.GetString("RABBITMQ_USERNAME"),
+		RabbitMQPassword:   viper.GetString("RABBITMQ_PASSWORD"),
+		RabbitMQVHost:      viper.GetString("RABBITMQ_VHOST"),
+		RabbitMQExchange:   viper.GetString("RABBITMQ_EXCHANGE"),
+		RabbitMQQueue:      viper.GetString("RABBITMQ_QUEUE"),
+		RabbitMQRoutingKey: viper.GetString("RABBITMQ_ROUTING_KEY"),
+
 		JWTAccessSecret: viper.GetString("JWT_ACCESS_SECRET"),
 	}
 
@@ -53,6 +71,9 @@ func validate(cfg *Config) error {
 	}{
 		{"DATABASE_URL", cfg.DatabaseURL},
 		{"JWT_ACCESS_SECRET", cfg.JWTAccessSecret},
+		{"RABBITMQ_HOST", cfg.RabbitMQHost},
+		{"RABBITMQ_QUEUE", cfg.RabbitMQQueue},
+		{"RABBITMQ_ROUTING_KEY", cfg.RabbitMQRoutingKey},
 	}
 
 	for _, r := range required {

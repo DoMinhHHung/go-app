@@ -18,13 +18,14 @@ type Config struct {
 	RedisPort     string
 	RedisPassword string
 
-	RabbitMQHost            string
-	RabbitMQPort            int
-	RabbitMQUsername        string
-	RabbitMQPassword        string
-	RabbitMQVHost           string
-	RabbitMQExchange        string
-	RabbitMQRoutingKeyEmail string
+	RabbitMQHost               string
+	RabbitMQPort               int
+	RabbitMQUsername           string
+	RabbitMQPassword           string
+	RabbitMQVHost              string
+	RabbitMQExchange           string
+	RabbitMQRoutingKeyEmail    string
+	RabbitMQRoutingKeyUserSync string
 
 	JWTAccessSecret  string
 	JWTRefreshSecret string
@@ -85,13 +86,14 @@ func Load() (*Config, error) {
 		RedisPort:     viper.GetString("REDIS_PORT"),
 		RedisPassword: viper.GetString("REDIS_PASSWORD"),
 
-		RabbitMQHost:            viper.GetString("RABBITMQ_HOST"),
-		RabbitMQPort:            viper.GetInt("RABBITMQ_PORT"),
-		RabbitMQUsername:        viper.GetString("RABBITMQ_USERNAME"),
-		RabbitMQPassword:        viper.GetString("RABBITMQ_PASSWORD"),
-		RabbitMQVHost:           viper.GetString("RABBITMQ_VHOST"),
-		RabbitMQExchange:        viper.GetString("RABBITMQ_EXCHANGE"),
-		RabbitMQRoutingKeyEmail: viper.GetString("RABBITMQ_ROUTING_KEY_EMAIL"),
+		RabbitMQHost:               viper.GetString("RABBITMQ_HOST"),
+		RabbitMQPort:               viper.GetInt("RABBITMQ_PORT"),
+		RabbitMQUsername:           viper.GetString("RABBITMQ_USERNAME"),
+		RabbitMQPassword:           viper.GetString("RABBITMQ_PASSWORD"),
+		RabbitMQVHost:              viper.GetString("RABBITMQ_VHOST"),
+		RabbitMQExchange:           viper.GetString("RABBITMQ_EXCHANGE"),
+		RabbitMQRoutingKeyEmail:    viper.GetString("RABBITMQ_ROUTING_KEY_EMAIL"),
+		RabbitMQRoutingKeyUserSync: viper.GetString("RABBITMQ_ROUTING_KEY_USER_SYNC"),
 
 		JWTAccessSecret:  viper.GetString("JWT_ACCESS_SECRET"),
 		JWTRefreshSecret: viper.GetString("JWT_REFRESH_SECRET"),
@@ -120,6 +122,8 @@ func validate(cfg *Config) error {
 		{"JWT_REFRESH_SECRET", cfg.JWTRefreshSecret},
 		{"REDIS_HOST", cfg.RedisHost},
 		{"RABBITMQ_HOST", cfg.RabbitMQHost},
+		{"RABBITMQ_ROUTING_KEY_EMAIL", cfg.RabbitMQRoutingKeyEmail},
+		{"RABBITMQ_ROUTING_KEY_USER_SYNC", cfg.RabbitMQRoutingKeyUserSync},
 	}
 
 	for _, r := range required {

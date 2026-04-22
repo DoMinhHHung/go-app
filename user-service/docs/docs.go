@@ -15,33 +15,177 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/health": {
+        "/api/v1/users/me": {
             "get": {
-                "description": "Kiểm tra user-service có đang chạy không",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "system"
-                ],
-                "summary": "Health check",
+                "security": [{"BearerAuth": []}],
+                "description": "Trả về thông tin của user đang đăng nhập dựa trên JWT được API Gateway xác thực.",
+                "produces": ["application/json"],
+                "tags": ["users"],
+                "summary": "Lấy thông tin profile bản thân",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {"$ref": "#/definitions/dto.Response"},
+                                {"type": "object", "properties": {"data": {"$ref": "#/definitions/usecase.ProfileOutput"}}}
+                            ]
                         }
+                    },
+                    "401": {"description": "Chưa đăng nhập",    "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "404": {"description": "User không tồn tại", "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "500": {"description": "Lỗi server",         "schema": {"$ref": "#/definitions/dto.ErrorResponse"}}
+                }
+            },
+            "put": {
+                "security": [{"BearerAuth": []}],
+                "description": "Cho phép user cập nhật full_name và phone_number của chính mình.",
+                "consumes": ["application/json"],
+                "produces": ["application/json"],
+                "tags": ["users"],
+                "summary": "Cập nhật profile bản thân",
+                "parameters": [
+                    {
+                        "description": "Thông tin cập nhật",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {"$ref": "#/definitions/dto.UpdateProfileRequest"}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {"$ref": "#/definitions/dto.Response"},
+                                {"type": "object", "properties": {"data": {"$ref": "#/definitions/usecase.ProfileOutput"}}}
+                            ]
+                        }
+                    },
+                    "400": {"description": "Dữ liệu không hợp lệ", "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "401": {"description": "Chưa đăng nhập",       "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "404": {"description": "User không tồn tại",   "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "500": {"description": "Lỗi server",            "schema": {"$ref": "#/definitions/dto.ErrorResponse"}}
+                }
+            },
+            "delete": {
+                "security": [{"BearerAuth": []}],
+                "description": "Soft delete tài khoản của user đang đăng nhập. Sau khi xóa, email/phone có thể đăng ký lại.",
+                "produces": ["application/json"],
+                "tags": ["users"],
+                "summary": "Xóa tài khoản bản thân (soft delete)",
+                "responses": {
+                    "200": {"description": "Xóa thành công",      "schema": {"$ref": "#/definitions/dto.Response"}},
+                    "401": {"description": "Chưa đăng nhập",      "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "404": {"description": "User không tồn tại",  "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "500": {"description": "Lỗi server",           "schema": {"$ref": "#/definitions/dto.ErrorResponse"}}
+                }
+            }
+        },
+        "/api/v1/users": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "Trả về danh sách tất cả user đang active. Chỉ dành cho admin.",
+                "produces": ["application/json"],
+                "tags": ["users"],
+                "summary": "Danh sách users (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Số lượng kết quả (mặc định 20, tối đa 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Vị trí bắt đầu",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {"$ref": "#/definitions/dto.Response"},
+                                {"type": "object", "properties": {"data": {"$ref": "#/definitions/dto.ListUsersData"}}}
+                            ]
+                        }
+                    },
+                    "401": {"description": "Chưa đăng nhập",  "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "403": {"description": "Không phải admin", "schema": {"$ref": "#/definitions/dto.ErrorResponse"}},
+                    "500": {"description": "Lỗi server",       "schema": {"$ref": "#/definitions/dto.ErrorResponse"}}
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Kiểm tra user-service có đang chạy không",
+                "produces": ["application/json"],
+                "tags": ["system"],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {"type": "object", "additionalProperties": {"type": "string"}}
                     }
                 }
             }
         }
     },
+    "definitions": {
+        "dto.Response": {
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean", "example": true},
+                "message": {"type": "string",  "example": "ok"},
+                "data":    {}
+            }
+        },
+        "dto.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean", "example": false},
+                "message": {"type": "string",  "example": "error description"},
+                "code":    {"type": "string",  "example": "ERROR_CODE"}
+            }
+        },
+        "dto.UpdateProfileRequest": {
+            "type": "object",
+            "properties": {
+                "full_name":    {"type": "string", "example": "Nguyen Van A",    "minLength": 2, "maxLength": 100},
+                "phone_number": {"type": "string", "example": "+84912345678",   "minLength": 7, "maxLength": 15}
+            }
+        },
+        "dto.ListUsersData": {
+            "type": "object",
+            "properties": {
+                "users":  {"type": "array", "items": {"$ref": "#/definitions/usecase.ProfileOutput"}},
+                "limit":  {"type": "integer", "example": 20},
+                "offset": {"type": "integer", "example": 0}
+            }
+        },
+        "usecase.ProfileOutput": {
+            "type": "object",
+            "properties": {
+                "id":            {"type": "string",  "example": "01932b4a-dead-7abc-8def-123456789abc"},
+                "email_address": {"type": "string",  "example": "user@example.com"},
+                "phone_number":  {"type": "string",  "example": "+84912345678"},
+                "full_name":     {"type": "string",  "example": "Nguyen Van A"},
+                "role":          {"type": "string",  "example": "user",   "enum": ["user", "admin"]},
+                "status":        {"type": "string",  "example": "active", "enum": ["pending", "active", "banned"]},
+                "created_at":    {"type": "string",  "format": "date-time", "example": "2025-01-01T00:00:00Z"},
+                "updated_at":    {"type": "string",  "format": "date-time", "example": "2025-01-01T00:00:00Z"}
+            }
+        }
+    },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Nhập \"Bearer \" và theo sau là JWT access token.",
+            "description": "Nhập \"Bearer \" và JWT access token. VD: \"Bearer eyJhbGci...\"",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -49,14 +193,13 @@ const docTemplate = `{
     }
 }`
 
-// SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8081",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "User Service API",
-	Description:      "Quản lý thông tin profile người dùng.",
+	Description:      "Quản lý thông tin profile người dùng. Tất cả routes yêu cầu JWT được validate bởi API Gateway.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

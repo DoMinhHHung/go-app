@@ -81,6 +81,7 @@ func main() {
 		rabbit.Channel,
 		cfg.RabbitMQExchange,
 		cfg.RabbitMQRoutingKeyEmail,
+		cfg.RabbitMQRoutingKeyUserSync,
 	)
 	if err != nil {
 		log.Fatal("publisher init failed", zap.Error(err))
